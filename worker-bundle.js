@@ -13045,8 +13045,126 @@ async function extractArticle(url) {
   };
 }
 async function extractTweet(url) {
-  const normalizedUrl = url.replace("x.com", "twitter.com");
+  const tweetIdMatch = url.match(/status\/(\d+)/);
+  const tweetId = tweetIdMatch ? tweetIdMatch[1] : null;
+  if (tweetId) {
+    try {
+      const syndicationUrl = `https://cdn.syndication.twimg.com/tweet-result?id=${tweetId}&token=x`;
+      const response = await fetch(syndicationUrl, {
+        headers: {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+          "Accept": "application/json",
+          "Referer": "https://platform.twitter.com/",
+          "Origin": "https://platform.twitter.com"
+        }
+      });
+      if (response.ok) {
+        const tweet = await response.json();
+        const textContent2 = tweet.text || "";
+        if (textContent2.length > 0) {
+          const author = tweet.user?.name || "Unknown";
+          const handle = tweet.user?.screen_name || "";
+          const wordCount = textContent2.split(/\s+/).filter(Boolean).length;
+          let mediaHtml = "";
+          let imageUrl = null;
+          if (tweet.mediaDetails?.length) {
+            imageUrl = tweet.mediaDetails[0].media_url_https || null;
+            mediaHtml = tweet.mediaDetails.filter((m) => m.type === "photo").map((m) => `<img src="${escapeHtml(m.media_url_https)}" alt="Tweet image" style="max-width: 100%; margin: 16px 0; border-radius: 8px;" />`).join("");
+          } else if (tweet.photos?.length) {
+            imageUrl = tweet.photos[0].url || null;
+            mediaHtml = tweet.photos.map((p) => `<img src="${escapeHtml(p.url)}" alt="Tweet image" style="max-width: 100%; margin: 16px 0; border-radius: 8px;" />`).join("");
+          }
+          if (!imageUrl && tweet.video?.poster) {
+            imageUrl = tweet.video.poster;
+          }
+          const createdAt = tweet.created_at || null;
+          const dateStr = createdAt ? new Date(createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "";
+          const styledContent = `
+            <div class="tweet-content">
+              <div style="border-left: 3px solid #333; padding-left: 16px; margin: 16px 0;">
+                <p style="white-space: pre-wrap;">${escapeHtml(textContent2)}</p>
+              </div>
+              ${mediaHtml}
+              <p style="margin-top: 8px; font-size: 12px; color: #666;">
+                @${escapeHtml(handle)}${dateStr ? ` \xB7 ${dateStr}` : ""}
+              </p>
+              <p style="margin-top: 16px; font-size: 14px;">
+                <a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">View on X &#x2197;</a>
+              </p>
+            </div>
+          `;
+          return {
+            title: `Tweet by ${author}`,
+            content: styledContent,
+            textContent: textContent2,
+            author,
+            excerpt: textContent2.substring(0, 200).trim(),
+            siteName: "Twitter/X",
+            wordCount,
+            estimatedReadTime: 1,
+            imageUrl,
+            publishedAt: createdAt,
+            originalHtml: JSON.stringify(tweet),
+            extractionFailed: false
+          };
+        }
+      }
+    } catch (err) {
+    }
+  }
   try {
+    const tweetPath = new URL(url).pathname;
+    const fxUrl = `https://api.fxtwitter.com${tweetPath}`;
+    const fxResponse = await fetch(fxUrl, {
+      headers: { "User-Agent": "Mozilla/5.0 (compatible; Shelf/1.0)" }
+    });
+    if (fxResponse.ok) {
+      const fxData = await fxResponse.json();
+      const tweet = fxData.tweet;
+      if (tweet && tweet.text) {
+        const author = tweet.author?.name || "Unknown";
+        const handle = tweet.author?.screen_name || "";
+        const textContent2 = tweet.text;
+        const wordCount = textContent2.split(/\s+/).filter(Boolean).length;
+        const imageUrl = tweet.media?.photos?.[0]?.url || null;
+        let mediaHtml = "";
+        if (tweet.media?.photos?.length) {
+          mediaHtml = tweet.media.photos.map((p) => `<img src="${escapeHtml(p.url)}" alt="Tweet image" style="max-width: 100%; margin: 16px 0; border-radius: 8px;" />`).join("");
+        }
+        const styledContent = `
+          <div class="tweet-content">
+            <div style="border-left: 3px solid #333; padding-left: 16px; margin: 16px 0;">
+              <p style="white-space: pre-wrap;">${escapeHtml(textContent2)}</p>
+            </div>
+            ${mediaHtml}
+            <p style="margin-top: 8px; font-size: 12px; color: #666;">
+              @${escapeHtml(handle)} \xB7 ${tweet.created_at ? new Date(tweet.created_at).toLocaleDateString() : ""}
+            </p>
+            <p style="margin-top: 16px; font-size: 14px;">
+              <a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">View on X &#x2197;</a>
+            </p>
+          </div>
+        `;
+        return {
+          title: `Tweet by ${author}`,
+          content: styledContent,
+          textContent: textContent2,
+          author,
+          excerpt: textContent2.substring(0, 200).trim(),
+          siteName: "Twitter/X",
+          wordCount,
+          estimatedReadTime: 1,
+          imageUrl,
+          publishedAt: tweet.created_at || null,
+          originalHtml: null,
+          extractionFailed: false
+        };
+      }
+    }
+  } catch (err) {
+  }
+  try {
+    const normalizedUrl = url.replace("x.com", "twitter.com");
     const oembedUrl = `https://publish.twitter.com/oembed?url=${encodeURIComponent(normalizedUrl)}&omit_script=true`;
     const response = await fetch(oembedUrl, {
       headers: { "User-Agent": "Mozilla/5.0 (compatible; Shelf/1.0)" }
@@ -13081,57 +13199,6 @@ async function extractTweet(url) {
           imageUrl: null,
           publishedAt: null,
           originalHtml: embedHtml,
-          extractionFailed: false
-        };
-      }
-    }
-  } catch (err) {
-  }
-  try {
-    const tweetPath = new URL(url).pathname;
-    const fxUrl = `https://api.fxtwitter.com${tweetPath}`;
-    const fxResponse = await fetch(fxUrl, {
-      headers: { "User-Agent": "Mozilla/5.0 (compatible; Shelf/1.0)" }
-    });
-    if (fxResponse.ok) {
-      const fxData = await fxResponse.json();
-      const tweet = fxData.tweet;
-      if (tweet && tweet.text) {
-        const author = tweet.author?.name || "Unknown";
-        const handle = tweet.author?.screen_name || "";
-        const textContent2 = tweet.text;
-        const wordCount = textContent2.split(/\s+/).filter(Boolean).length;
-        const imageUrl = tweet.media?.photos?.[0]?.url || null;
-        let mediaHtml = "";
-        if (tweet.media?.photos?.length) {
-          mediaHtml = tweet.media.photos.map((p) => `<img src="${escapeHtml(p.url)}" alt="Tweet image" style="max-width: 100%; margin: 16px 0;" />`).join("");
-        }
-        const styledContent = `
-          <div class="tweet-content">
-            <div style="border-left: 3px solid #333; padding-left: 16px; margin: 16px 0;">
-              <p style="white-space: pre-wrap;">${escapeHtml(textContent2)}</p>
-            </div>
-            ${mediaHtml}
-            <p style="margin-top: 8px; font-size: 12px; color: #666;">
-              @${escapeHtml(handle)} \xB7 ${tweet.created_at ? new Date(tweet.created_at).toLocaleDateString() : ""}
-            </p>
-            <p style="margin-top: 16px; font-size: 14px;">
-              <a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">View on X &#x2197;</a>
-            </p>
-          </div>
-        `;
-        return {
-          title: `Tweet by ${author}`,
-          content: styledContent,
-          textContent: textContent2,
-          author,
-          excerpt: textContent2.substring(0, 200).trim(),
-          siteName: "Twitter/X",
-          wordCount,
-          estimatedReadTime: 1,
-          imageUrl,
-          publishedAt: tweet.created_at || null,
-          originalHtml: null,
           extractionFailed: false
         };
       }
