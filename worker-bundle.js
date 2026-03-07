@@ -13125,7 +13125,7 @@ async function extractTweet(url) {
         const author = tweet.author?.name || "Unknown";
         const handle = tweet.author?.screen_name || "";
         let textContent2 = tweet.raw_text?.text || tweet.text;
-        textContent2 = textContent2.replace(/\s*https:\/\/t\.co\/\w+\s*$/g, "").trim();
+        textContent2 = textContent2.replace(/\s*https:\/\/t\.co\/\w+/g, "").trim();
         const wordCount = textContent2.split(/\s+/).filter(Boolean).length;
         const imageUrl = tweet.media?.photos?.[0]?.url || null;
         let mediaHtml = "";
