@@ -13124,12 +13124,20 @@ async function extractTweet(url) {
       if (tweet && tweet.text) {
         const author = tweet.author?.name || "Unknown";
         const handle = tweet.author?.screen_name || "";
-        const textContent2 = tweet.text;
+        let textContent2 = tweet.raw_text?.text || tweet.text;
+        textContent2 = textContent2.replace(/\s*https:\/\/t\.co\/\w+\s*$/g, "").trim();
         const wordCount = textContent2.split(/\s+/).filter(Boolean).length;
         const imageUrl = tweet.media?.photos?.[0]?.url || null;
         let mediaHtml = "";
         if (tweet.media?.photos?.length) {
           mediaHtml = tweet.media.photos.map((p) => `<img src="${escapeHtml(p.url)}" alt="Tweet image" style="max-width: 100%; margin: 16px 0; border-radius: 8px;" />`).join("");
+        }
+        if (tweet.media?.videos?.length && !mediaHtml) {
+          const video = tweet.media.videos[0];
+          if (video.thumbnail_url) {
+            mediaHtml = `<img src="${escapeHtml(video.thumbnail_url)}" alt="Video thumbnail" style="max-width: 100%; margin: 16px 0; border-radius: 8px;" />
+              <p style="font-size: 12px; color: #666; margin-top: -8px;">\u25B6 Video \u2014 view on X</p>`;
+          }
         }
         const styledContent = `
           <div class="tweet-content">
