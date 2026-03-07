@@ -14,11 +14,12 @@ jobs:
       - name: Deploy shelf-api worker
         run: |
           curl -s -X PUT \
-            "https://api.cloudflare.com/client/v4/accounts/${{ secrets.CLOUDFLARE_ACCOUNT_ID }}/workers/scripts/shelf-api" \
-            -H "Authorization: Bearer ${{ secrets.CLOUDFLARE_API_TOKEN }}" \
+            "https://api.cloudflare.com/client/v4/accounts/5ebf4dfeed3c2032a2e7253c8edf7be4/workers/scripts/shelf-api" \
+            -H "Authorization: Bearer mPFCv9VGz19VQ1um8WXH5v7rAeuN80xs5zPddCBq" \
             -F "worker.js=@worker-bundle.js;type=application/javascript+module" \
             -F 'metadata={"main_module":"worker.js","compatibility_date":"2024-01-01","bindings":[{"type":"d1","name":"DB","id":"29123fd1-a755-4950-9f5e-daea07f1da4e"},{"type":"r2_bucket","name":"STORAGE","bucket_name":"shelf-files"},{"type":"plain_text","name":"API_KEY","text":"c588895447ecef6d3dc2b67d06ead8ecd266f0e6e77604453f9d6860606def1f"}]};type=application/json' \
             | tee /tmp/deploy-result.json | jq .
+
           SUCCESS=$(jq -r '.success' /tmp/deploy-result.json)
           if [ "$SUCCESS" != "true" ]; then
             echo "Deployment failed!"
@@ -34,11 +35,12 @@ jobs:
       - name: Deploy shelf-frontend worker
         run: |
           curl -s -X PUT \
-            "https://api.cloudflare.com/client/v4/accounts/${{ secrets.CLOUDFLARE_ACCOUNT_ID }}/workers/scripts/shelf-frontend" \
-            -H "Authorization: Bearer ${{ secrets.CLOUDFLARE_API_TOKEN }}" \
+            "https://api.cloudflare.com/client/v4/accounts/5ebf4dfeed3c2032a2e7253c8edf7be4/workers/scripts/shelf-frontend" \
+            -H "Authorization: Bearer mPFCv9VGz19VQ1um8WXH5v7rAeuN80xs5zPddCBq" \
             -F "worker.js=@frontend-worker.js;type=application/javascript+module" \
             -F 'metadata={"main_module":"worker.js","compatibility_date":"2024-01-01","bindings":[]};type=application/json' \
             | tee /tmp/deploy-result.json | jq .
+
           SUCCESS=$(jq -r '.success' /tmp/deploy-result.json)
           if [ "$SUCCESS" != "true" ]; then
             echo "Deployment failed!"
